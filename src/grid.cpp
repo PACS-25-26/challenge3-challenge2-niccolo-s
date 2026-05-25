@@ -7,7 +7,7 @@
 void Grid::compute_row_range(int n, int rank, int size, int& begin, int& end)
 {
     // Distribute n rows as evenly as possible.
-    // First `extra` ranks get (base+1) rows; the rest get base rows.
+    // First ranks get (base+1) rows; the rest get base rows.
     const int base  = n / size;
     const int extra = n % size;
 

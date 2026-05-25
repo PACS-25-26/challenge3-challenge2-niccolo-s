@@ -3,6 +3,7 @@
 
 #include <cmath>
 
+// Jacobi method
 SolverResult jacobi(Grid& g,
                     const Field& f,
                     const Field& bc_top,
@@ -22,7 +23,7 @@ SolverResult jacobi(Grid& g,
 
     for (int iter = 0; iter < max_iter; ++iter)
     {
-        // Data exchange - to be implemented with MPI
+        // Data exchange
         data_exchange(g, comm);
 
         // Jacobi update + local error sum
@@ -55,10 +56,10 @@ SolverResult jacobi(Grid& g,
             }
         }
 
-        // Global convergence check - to be implemented in MPI
+        // Global convergence check
         const double error = global_error(g, local_sum, comm);
 
-        // Swap U and U_new
+        // Swap buffers
         g.swap_buffers();
 
         result.iterations = iter + 1;
