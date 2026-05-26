@@ -57,7 +57,7 @@ SolverResult jacobi(Grid& g,
         }
 
         // Global convergence check
-        const double error = global_error(g, local_sum, comm);
+        const double error = check_convergence(g, local_sum, comm);
 
         // Swap buffers
         g.swap_buffers();
