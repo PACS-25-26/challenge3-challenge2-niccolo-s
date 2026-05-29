@@ -24,6 +24,17 @@ SolverResult jacobi_solve(Grid& g,
     const int c_start = (bc_left.type  == BCType::Dirichlet) ? 1 : 0;
     const int c_stop  = (bc_right.type == BCType::Dirichlet) ? n - 2 : n - 1;
 
+    // Pre-compute forcing term values
+    std::vector<double> f_vals(local_n * n, 0.0);
+    for (int r = 1; r <= local_n; ++r)
+    {
+        const int global_r = g.global_row_begin() + r - 1;
+        if (global_r == 0 || global_r == n - 1) continue;
+        const double y = g.y_coord(r - 1);
+        for (int c = 1; c < n - 1; ++c)
+            f_vals[(r-1) * n + c] = f(g.x_coord(c), y);
+    }
+
     SolverResult result{0, 0.0, false};
 
     for (int iter = 0; iter < max_iter; ++iter)
@@ -138,7 +149,7 @@ SolverResult jacobi_solve(Grid& g,
 
                 // Jacobi update
                 const double new_val =
-                    (u_north + u_south + u_west + u_east + h2 * f(x, y)) / denom;
+                    (u_north + u_south + u_west + u_east + h2 * f_vals[(r-1) * n + c]) / denom;
 
                 const double diff = new_val - g(r, c);
                 local_sum += diff * diff;
