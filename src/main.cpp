@@ -81,11 +81,11 @@ int main(int argc, char* argv[])
                   << "  exact sol : " << (pd.has_exact ? "yes" : "no") << "\n\n";
     }
 
-    // ── Build grid ────────────────────────────────────────────────────────────
+    // Build grid
     Grid g(pd.n, rank, size,
            pd.bc_top, pd.bc_bottom, pd.bc_left, pd.bc_right);
 
-    // ── Solve ─────────────────────────────────────────────────────────────────
+    // Solve
     const double t_start = MPI_Wtime();
 
     SolverResult result = jacobi_solve(g, pd.forcing,
@@ -106,7 +106,7 @@ int main(int argc, char* argv[])
                   << "  computing time : " << (t_end - t_start) << " s\n\n";
     }
 
-   // ── L2 error (only if exact solution is provided in JSON) ─────────────────
+   // L2 error (only if exact solution is provided in JSON)
     if (pd.has_exact)
     {
         const double l2_err = compute_l2_error(g, pd.exact_solution,
@@ -116,7 +116,7 @@ int main(int argc, char* argv[])
                       << l2_err << "\n\n";
     }
 
-    // ── Write VTK ─────────────────────────────────────────────────────────────
+    // Write VTK
     write_vtk(g, pd.output_file);
 
     if (rank == 0)
