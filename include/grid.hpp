@@ -24,12 +24,39 @@
  * 2D access via operator():
  *   grid(r, c)       ->  U[r * n + c]      (solution at current iteration)
  *   grid.new_(r, c)  ->  U_new[r * n + c]  (solution at next iteration)
+ * 
+ * Coordinate convention:
+ *   global row 0   ->  y = 1  (top)
+ *   global row n-1 ->  y = 0  (bottom)
+ *   column 0       ->  x = 0  (left)
+ *   column n-1     ->  x = 1  (right)
  */
 
 
 /// Function-type alias that takes two doubles and returns a double (for BCs, forcing term, ...)
 using Field = std::function<double(double, double)>;
 
+
+/// Boundary condition types
+enum class BCType { Dirichlet, Neumann, Robin };
+/**
+ * @brief Describes a boundary condition on one edge of the domain.
+ */
+struct BoundaryCondition
+{
+    BCType type  = BCType::Dirichlet;
+    Field  value;           ///< prescribed value / flux / Robin rhs
+    double alpha = 0.0;     ///< Robin coefficient (unused for Dir/Neu)
+
+    static BoundaryCondition dirichlet(Field f)
+    { return {BCType::Dirichlet, std::move(f), 0.0}; }
+
+    static BoundaryCondition neumann(Field f)
+    { return {BCType::Neumann, std::move(f), 0.0}; }
+
+    static BoundaryCondition robin(Field f, double a)
+    { return {BCType::Robin, std::move(f), a}; }
+};
 
 class Grid
 {
@@ -66,22 +93,23 @@ public:
      *
      * Computes the row decomposition so that rows are distributed as evenly
      * as possible (remainder rows are given to the first ranks one by one).
-     * Allocates U and U_new, fills boundary rows with the Dirichlet BC
-     * functions, and sets all interior entries to zero.
+     * Dirichlet boundary nodes are initialised to their prescribed values.
+     * Neumann/Robin boundary nodes are initialised to zero and updated
+     * during the Jacobi iteration.
      *
      * @param n          Global grid size (n points per side).
      * @param rank       MPI rank of the calling process.
      * @param size       Total number of MPI processes.
-     * @param bc_top     Dirichlet BC at y = 1 (top boundary, global row 0).
-     * @param bc_bottom  Dirichlet BC at y = 0 (bottom boundary, global row n-1).
-     * @param bc_left    Dirichlet BC at x = 0 (column 0).
-     * @param bc_right   Dirichlet BC at x = 1 (column n-1).
+     * @param bc_top     BC at y = 1  (global row 0).
+     * @param bc_bottom  BC at y = 0  (global row n-1).
+     * @param bc_left    BC at x = 0  (column 0).
+     * @param bc_right   BC at x = 1  (column n-1).
      */
     Grid(int n, int rank, int size,
-         const Field& bc_top,
-         const Field& bc_bottom,
-         const Field& bc_left,
-         const Field& bc_right);
+         const BoundaryCondition& bc_top,
+         const BoundaryCondition& bc_bottom,
+         const BoundaryCondition& bc_left,
+         const BoundaryCondition& bc_right);
 
     
     // 2D element access
@@ -101,11 +129,15 @@ public:
     // Boundary conditions
     /**
      * @brief Apply Dirichlet BCs to all owned boundary rows/columns.
+     * 
+     * Only Dirichlet nodes are set here; Neumann/Robin nodes are handled
+     * by the Jacobi update loop using the ghost node method.
+     * Called once during construction and after each buffer swap.
      */
-    void apply_boundary_conditions(const Field& bc_top,
-                                   const Field& bc_bottom,
-                                   const Field& bc_left,
-                                   const Field& bc_right);
+    void apply_boundary_conditions(const BoundaryCondition& bc_top,
+                                   const BoundaryCondition& bc_bottom,
+                                   const BoundaryCondition& bc_left,
+                                   const BoundaryCondition& bc_right);
 
     // Raw buffer access (needed by MPI send/recv in mpi_utils)
 
@@ -125,7 +157,7 @@ public:
     int    rank_below()       const { return rank_below_; }
 
     double x_coord(int j) const { return x_coords_[j]; }
-    double y_coord(int r) const { return y_coords_[r]; } ///< r is local owned index (0, ..., local_n-1)
+    double y_coord(int r) const { return y_coords_[r]; } ///< r is the local owned index (0, ..., local_n-1)
 
     // Static helper: row range for any rank
     /**

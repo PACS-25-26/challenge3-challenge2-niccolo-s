@@ -23,10 +23,10 @@ void Grid::compute_row_range(int n, int rank, int size, int& begin, int& end)
 
 // Constructor
 Grid::Grid(int n, int rank, int size,
-           const Field& bc_top,
-           const Field& bc_bottom,
-           const Field& bc_left,
-           const Field& bc_right)
+           const BoundaryCondition& bc_top,
+           const BoundaryCondition& bc_bottom,
+           const BoundaryCondition& bc_left,
+           const BoundaryCondition& bc_right)
     : n_(n)
     , h_(1.0 / static_cast<double>(n - 1))
     , rank_(rank)
@@ -67,49 +67,58 @@ Grid::Grid(int n, int rank, int size,
 }
 
 
-// Apply BCs
-void Grid::apply_boundary_conditions(const Field& bc_top,
-                                     const Field& bc_bottom,
-                                     const Field& bc_left,
-                                     const Field& bc_right)
+// Apply Dirichlet BCs
+// Only Dirichlet nodes are involved.
+// Neumann/Robin nodes start at zero and are updated by the Jacobi loop.
+void Grid::apply_boundary_conditions(const BoundaryCondition& bc_top,
+                                     const BoundaryCondition& bc_bottom,
+                                     const BoundaryCondition& bc_left,
+                                     const BoundaryCondition& bc_right)
 {
     // Top boundary: global row 0, y = 1
     // Local row index for the first owned row is always 1 (row 0 is ghost top).
-    if (global_row_begin_ == 0)
+    if (global_row_begin_ == 0 && bc_top.type == BCType::Dirichlet)
     {
         const double y = y_coords_[0]; // = 1.0
         for (int j = 0; j < n_; ++j)
         {
-            const double val = bc_top(x_coords_[j], y);
+            const double val = bc_top.value(x_coords_[j], y);
             (*this)(1, j) = val;
             new_(1, j) = val;
         }
     }
 
     // Bottom boundary: global row n-1, y = 0
-    if (global_row_end_ == n_ - 1)
+    if (global_row_end_ == n_ - 1 && bc_bottom.type == BCType::Dirichlet)
     {
         const double y = y_coords_[local_n_ - 1]; // = 0.0
         for (int j = 0; j < n_; ++j)
         {
-            const double val = bc_bottom(x_coords_[j], y);
+            const double val = bc_bottom.value(x_coords_[j], y);
             (*this)(local_n_, j) = val;
             new_(local_n_, j) = val;
         }
     }
 
-    // Left and right boundaries: columns 0 and n-1 (all owned rows)
-    for (int r = 0; r < local_n_; ++r)
+    // Left boundary: column 0 (all owned rows)
+    if (bc_left.type == BCType::Dirichlet)
     {
-        const double y = y_coords_[r];
+        for (int r = 0; r < local_n_; ++r)
+        {
+            const double val = bc_left.value(0.0, y_coords_[r]);
+            (*this)(r + 1, 0) = val;
+            new_  (r + 1, 0) = val;
+        }
+    }
 
-        const double val_left  = bc_left (0.0, y);
-        const double val_right = bc_right(1.0, y);
-
-        (*this)(r + 1, 0) = val_left;
-        new_(r + 1, 0)    = val_left;
-
-        (*this)(r + 1, n_ - 1) = val_right;
-        new_(r + 1, n_ - 1)    = val_right;
+    // Right boundary: column n-1 (all owned rows)
+    if (bc_right.type == BCType::Dirichlet)
+    {
+        for (int r = 0; r < local_n_; ++r)
+        {
+            const double val = bc_right.value(1.0, y_coords_[r]);
+            (*this)(r + 1, n_ - 1) = val;
+            new_  (r + 1, n_ - 1) = val;
+        }
     }
 }

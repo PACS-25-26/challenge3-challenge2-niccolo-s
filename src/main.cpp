@@ -1,6 +1,7 @@
 #include "grid.hpp"
 #include "jacobi_solver.hpp"
 #include "vtk_writer.hpp"
+#include "problem_data.hpp"
 
 #include <mpi.h>
 #include <cmath>
@@ -8,19 +9,8 @@
 #include <stdexcept>
 #include <string>
 
-// Forcing term and exact solution
-static double forcing(double x, double y)
-{
-    return 8.0 * M_PI * M_PI * std::sin(2.0 * M_PI * x) * std::sin(2.0 * M_PI * y);
-}
-
-static double exact(double x, double y)
-{
-    return std::sin(2.0 * M_PI * x) * std::sin(2.0 * M_PI * y);
-}
-
 // L2 error norm against the exact solution
-static double compute_l2_error(const Grid& g, MPI_Comm comm)
+static double compute_l2_error(const Grid& g, const Field& exact, MPI_Comm comm)
 {
     const int    n       = g.n();
     const double h       = g.h();
@@ -61,39 +51,48 @@ int main(int argc, char* argv[])
     MPI_Comm_size(MPI_COMM_WORLD, &size);
 
     // Check arguments
-    if (argc < 4)
+    if (argc < 2)
     {
+        if (rank == 0)
+            std::cerr << "Usage: " << argv[0] << " <problem.json>\n";
         MPI_Finalize();
         return 1;
     }
 
-    const int    n        = std::stoi(argv[1]);
-    const double tol      = std::stod(argv[2]);
-    const int    max_iter = std::stoi(argv[3]);
-    const std::string vtk_file = (argc >= 5) ? argv[4] : "solution.vtk";
+    // Load problem data
+    ProblemData pd;
+    try {
+        pd = load_problem(argv[1]);
+    } catch (const std::exception& e) {
+        if (rank == 0)
+            std::cerr << "ERROR loading problem: " << e.what() << "\n";
+        MPI_Finalize();
+        return 1;
+    }
 
     if (rank == 0)
     {
         std::cout << "=== Jacobi solver ===\n"
-                  << "  grid size : " << n << " x " << n << "\n"
-                  << "  tolerance : " << tol << "\n"
-                  << "  max iter  : " << max_iter << "\n"
+                  << "  grid size : " << pd.n << " x " << pd.n << "\n"
+                  << "  tolerance : " << pd.tolerance << "\n"
+                  << "  max iter  : " << pd.max_iter << "\n"
                   << "  MPI ranks : " << size << "\n"
-                  << "  output file name (default: solution.vtk) : " << vtk_file << "\n\n";
+                  << "  output    : " << pd.output_file << "\n"
+                  << "  exact sol : " << (pd.has_exact ? "yes" : "no") << "\n\n";
     }
 
-    // Homogeneous Dirichlet BCs
-    auto zero = [](double, double){ return 0.0; };
+    // ── Build grid ────────────────────────────────────────────────────────────
+    Grid g(pd.n, rank, size,
+           pd.bc_top, pd.bc_bottom, pd.bc_left, pd.bc_right);
 
-    // Build grid
-    Grid g(n, rank, size, zero, zero, zero, zero);
-
-    // Solve
+    // ── Solve ─────────────────────────────────────────────────────────────────
     const double t_start = MPI_Wtime();
 
-    SolverResult result = jacobi(g, forcing,
-                                zero, zero, zero, zero,
-                                tol, max_iter);
+    SolverResult result = jacobi_solve(g, pd.forcing,
+                                       pd.bc_top,    pd.bc_bottom,
+                                       pd.bc_left,   pd.bc_right,
+                                       pd.tolerance, pd.max_iter);
+
 
     const double t_end = MPI_Wtime();
 
@@ -107,16 +106,21 @@ int main(int argc, char* argv[])
                   << "  computing time : " << (t_end - t_start) << " s\n\n";
     }
 
-    // L2 error against exact solution
-    const double l2_err = compute_l2_error(g, MPI_COMM_WORLD);
-    if (rank == 0)
-        std::cout << "  L2 error: approximate vs exact solution: " << l2_err << "\n\n";
+   // ── L2 error (only if exact solution is provided in JSON) ─────────────────
+    if (pd.has_exact)
+    {
+        const double l2_err = compute_l2_error(g, pd.exact_solution,
+                                               MPI_COMM_WORLD);
+        if (rank == 0)
+            std::cout << "  L2 error: approximate vs exact solution: "
+                      << l2_err << "\n\n";
+    }
 
-    // Write VTK file
-    write_vtk(g, vtk_file);
+    // ── Write VTK ─────────────────────────────────────────────────────────────
+    write_vtk(g, pd.output_file);
 
     if (rank == 0)
-        std::cout << "Solution written to " << vtk_file << "\n";
+        std::cout << "Solution written to " << pd.output_file << "\n";
 
     MPI_Finalize();
     return 0;
