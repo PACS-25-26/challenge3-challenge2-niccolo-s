@@ -3,6 +3,7 @@
 #include <fstream>
 #include <stdexcept>
 #include <vector>
+#include <filesystem>
 
 void write_vtk(const Grid& g, const std::string& filename, MPI_Comm comm)
 {
@@ -47,6 +48,14 @@ void write_vtk(const Grid& g, const std::string& filename, MPI_Comm comm)
                  src, tag, comm, MPI_STATUS_IGNORE);
 
         row_offset += src_local_n;
+    }
+
+    // Create the output directory "solutions" if it doesn't exist
+    if (rank == 0)
+    {
+        const auto parent = std::filesystem::path(filename).parent_path();
+        if (!parent.empty())
+            std::filesystem::create_directories(parent);
     }
 
     // Write the VTK file on rank 0

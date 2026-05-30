@@ -38,6 +38,7 @@
 *.exe
 *.out
 *.app
+jacobi_solver
 
 # Build directories
 build/
