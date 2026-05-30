@@ -38,17 +38,19 @@
 *.exe
 *.out
 *.app
+jacobi_solver
 
 # Build directories
 build/
 Build/
 build-*/
+obj/
 
 # CMake generated files
 CMakeFiles/
 CMakeCache.txt
 cmake_install.cmake
-Makefile
+# Makefile
 install_manifest.txt
 compile_commands.json
 
@@ -67,3 +69,12 @@ vcpkg_installed/
 # test output & cache
 Testing/
 .cache/
+
+# vscode
+.vscode/
+
+# vtk files
+*.vtk
+
+# solutions folder
+solutions/

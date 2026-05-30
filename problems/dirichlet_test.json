@@ -1,0 +1,14 @@
+{
+    "n":              256,
+    "tolerance":      1e-6,
+    "max_iter":       50000,
+    "output":         "solution.vtk",
+
+    "forcing":        "8*pi^2*sin(2*pi*x)*sin(2*pi*y)",
+    "exact_solution": "sin(2*pi*x)*sin(2*pi*y)",
+
+    "bc_top":    { "type": "dirichlet", "value": "0.0" },
+    "bc_bottom": { "type": "dirichlet", "value": "0.0" },
+    "bc_left":   { "type": "dirichlet", "value": "0.0" },
+    "bc_right":  { "type": "dirichlet", "value": "0.0" }
+}

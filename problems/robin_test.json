@@ -1,0 +1,14 @@
+{
+    "n":          32,
+    "tolerance":  1e-5,
+    "max_iter":   20000,
+    "output":     "solution_robin.vtk",
+
+    "forcing":        "8*pi^2*sin(2*pi*x)*sin(2*pi*y)",
+    "exact_solution": "sin(2*pi*x)*sin(2*pi*y)",
+
+    "bc_top":    { "type": "dirichlet", "value": "0.0" },
+    "bc_bottom": { "type": "dirichlet", "value": "0.0" },
+    "bc_left":   { "type": "robin", "value": "0.0", "alpha": 1.0 },
+    "bc_right":  { "type": "robin", "value": "0.0", "alpha": 1.0 }
+}
